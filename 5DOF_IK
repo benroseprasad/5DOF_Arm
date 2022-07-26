@@ -1,0 +1,90 @@
+%reset -f
+import numpy as np
+from mpl_toolkits import mplot3d
+%matplotlib inline
+import matplotlib.pyplot as plt
+
+L1=2;L2=10;L3=10;L4=7;
+
+EF_Position = [[10],[10],[0]]     #position of the center of gripper
+EF_Angle_with_ground = 90         #in degrees
+EF_Roll = 0
+
+Xe = EF_Position[0][0]
+Ye = EF_Position[1][0]
+Ze = EF_Position[2][0]
+
+w = np.arctan2(Ye,Xe) #Same as th1 (Yaw)
+v = (EF_Angle_with_ground-90)*np.pi/180 #Angle of gripper towards ground (pitch)
+u = EF_Roll*np.pi/180 # rotation of gripper around axis (roll)
+
+Rotation_Matrix = [[np.cos(v)*np.cos(w), np.sin(u)*np.sin(v)*np.cos(w)-np.cos(u)*np.sin(w),   np.sin(u)*np.sin(w) + np.cos(u)*np.sin(v)*np.cos(w)],
+                   [np.cos(v)*np.sin(w), np.cos(u)*np.cos(w)+np.sin(u)*np.sin(v)*np.sin(w),   np.cos(u)*np.sin(v)*np.sin(w)-np.sin(u)*np.cos(w)],
+                   [-np.sin(v),          np.sin(u)*np.cos(v),                                 np.cos(u)*np.cos(v)]]
+
+#Creating Tansformation matrix
+T0_6 = [[Rotation_Matrix[0][0], Rotation_Matrix[0][1], Rotation_Matrix[0][2], Xe],
+        [Rotation_Matrix[1][0], Rotation_Matrix[1][1], Rotation_Matrix[1][2], Ye],
+        [Rotation_Matrix[2][0], Rotation_Matrix[2][1], Rotation_Matrix[2][2], Ze],
+        [0,                     0,                     0,                     1 ]]
+
+DH_Para = [[0 ,  0     ,  2],
+          [0 , -np.pi/2,  0],
+          [10,  0      ,  0],
+          [10,  0      ,  0],
+          [0 ,  np.pi/2, -L4]]
+
+thetas = [0,0,0,0,0]
+
+T = np.identity(4)
+
+Goal_Pos = [[T0_6[0][3]],
+             [T0_6[1][3]],
+             [T0_6[2][3]]] 
+
+R06 =  [[T0_6[0][0], T0_6[0][1], T0_6[0][2] ],
+        [T0_6[1][0], T0_6[1][1], T0_6[1][2]  ],
+        [T0_6[2][0], T0_6[2][1], T0_6[2][2] ]]
+
+Zaxis = [[T0_6[0][2]],
+         [T0_6[1][2]],
+         [T0_6[2][2]]]
+
+#Position of joint 4 for inverse kinematics
+[[x],[y],[z]] = Goal_Pos - np.dot(Zaxis,DH_Para[4][2])
+
+
+r2 = np.sqrt(x**2+y**2+(z-L1)**2);
+
+th1 = np.arctan2(y,x)
+
+p = (r2**2+L2**2-L3**2)/(2*r2*L2);
+
+th2_a = (np.arctan2(-(z-L1),(np.sqrt(x**2+y**2))) + np.arctan2(np.sqrt((1-p**2)),p))
+th2_b = (np.arctan2(-(z-L1),(np.sqrt(x**2+y**2))) + np.arctan2(-np.sqrt((1-p**2)),p))
+
+q = (r2**2-L2**2-L3**2)/(2*L2*L3);
+th3_a = (np.arctan2(np.sqrt((1-q**2)),q))
+th3_b = (np.arctan2(-np.sqrt((1-q**2)),q))
+
+thetas = [th1,th2_b,th3_a]
+th2 = th2_b
+th3 = th3_a
+# print(thetas)
+T0_3 = np.identity(4)
+
+R03 = [[np.cos(th1)*np.cos(th2)*np.cos(th3)-np.cos(th1)*np.sin(th2)*np.sin(th3),  -np.cos(th1)*np.cos(th2)*np.sin(th3)-np.cos(th1)*np.sin(th2)*np.cos(th3), -np.sin(th1)],
+       [np.sin(th1)*np.cos(th2)*np.cos(th3)-np.sin(th1)*np.sin(th2)*np.sin(th3),  -np.sin(th1)*np.cos(th2)*np.sin(th3)-np.sin(th1)*np.sin(th2)*np.cos(th3),  np.cos(th1)],
+       [-np.sin(th2)*np.cos(th3)-np.cos(th2)*np.sin(th3)                       ,   np.sin(th2)*np.sin(th3)-np.cos(th2)*np.cos(th3)                        ,  0          ]]
+
+
+invR03 = np.linalg.inv(R03)
+
+R36 = np.dot(invR03,R06)
+
+th4 = np.arctan2(R36[0][2],-R36[1][2])
+th5 = np.arctan2(R36[2][0],R36[2][1])
+
+#Final answer (joint angles)
+print([th1,th2,th3,th4,th5])
+thetas = [th1,th2,th3,th4,th5]
